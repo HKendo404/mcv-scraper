@@ -16,7 +16,9 @@ Anyways, hope this is helpful for someone ;>
 
 ```
 # pull this repo
-# make ur venv
+python -m venv .venv
+
+# activate the venv
 
 pip install -r requirements.txt
 ```
