@@ -111,7 +111,7 @@ def set_preset(past: int, future: int):
 
 # smth to fix warning since buttons change the slider
 if "slider_range" not in st.session_state:
-    set_preset(-7, max_day)
+    set_preset(-1, max_day)
 
 
 (past_days, future_days) = st.select_slider(
