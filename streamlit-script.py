@@ -1,3 +1,5 @@
+import json
+import os
 from datetime import datetime as dt
 from datetime import timedelta
 
@@ -6,13 +8,12 @@ import pandas as pd
 import streamlit as st
 
 import main
-import json
-
-import os
 
 GREEN = "#052001"
 BLACK = "#000000"
 RED = "#200404"
+
+RELOAD_TIME_FORMAT = "%d/%m/%Y - %I:%M %p"
 
 st.set_page_config(layout="wide")
 
@@ -34,39 +35,47 @@ def timedelta_to_day_hour(t: timedelta) -> str:
     return humanize.naturaltime(-1 * round_timedelta_for_humanize(t))
 
 
-def save_metadata(year: str, sem: str):
+def save_metadata(year: str, sem: str, reload_time: dt):
     with open("./metadata.json", "w") as f:
-        json.dump({"year": year, "sem": sem}, f)
+        json.dump(
+            {
+                "year": year,
+                "sem": sem,
+                "reload_time": reload_time.strftime(RELOAD_TIME_FORMAT),
+            },
+            f,
+        )
 
 
 def load_metadata() -> tuple:
-    try:
-        with open("./metadata.json", "r") as f:
-            thing = json.load(f)
-            return (thing["year"], thing["sem"])
-    except FileNotFoundError:
-        return ("2026", "1")
+    with open("./metadata.json", "r") as f:
+        thing = json.load(f)
+        return (thing["year"], thing["sem"], thing["reload_time"])
 
 
-def reload_data(year: str, sem: str):
+def reload_data(year: str, sem: str, reload_time: dt):
     result = main.run_everything(year, sem)
     if result:
-        save_metadata(year, sem)
+        save_metadata(year, sem, reload_time)
         st.success("Successssss :>")
         if "slider_range" in st.session_state:
             del st.session_state["slider_range"]
     else:
-        print("Failed")
         st.error("It didnt work :<")
 
 
-data_df = None
-if os.path.isfile("./data.csv"):
-    data_df = pd.read_csv("./data.csv", encoding="utf-8")
-else:
-    curr_year, curr_sem = load_metadata()
-    reload_data(curr_year, curr_sem)
-    st.rerun()
+try:
+    curr_year, curr_sem, reload_time = load_metadata()
+except (FileNotFoundError, KeyError):
+    reload_data("2026", "1", dt.now())
+    curr_year, curr_sem, reload_time = load_metadata()
+
+
+if not os.path.isfile("./data.csv"):
+    reload_data("2026", "1", dt.now())
+    curr_year, curr_sem, reload_time = load_metadata()
+
+data_df = pd.read_csv("./data.csv", encoding="utf-8")
 
 now = pd.Timestamp.now()
 data_df["Due"] = pd.to_datetime(data_df["Due Date"])
@@ -80,7 +89,6 @@ st.header("I love MCV <3", text_alignment="center")
 
 
 with st.container(horizontal=True, width="content"):
-    curr_year, curr_sem = load_metadata()
     year = st.selectbox(
         "Year",
         options=[str(i) for i in range(2009, 2030 + 1)],
@@ -91,7 +99,7 @@ with st.container(horizontal=True, width="content"):
         options=["1", "2", "3"],
         default=curr_sem,
     )
-    st.button("Reload Assignments", on_click=reload_data, args=(year, sem))
+    st.button("Reload Assignments", on_click=reload_data, args=(year, sem, dt.now()))
 
 
 def format_day(x: int) -> str:
@@ -191,6 +199,8 @@ def legend(label: str, color: str):
 
 
 with st.container(horizontal=True, horizontal_alignment="center"):
+    st.markdown(f"Last reload: **{reload_time}**")
+
     st.dataframe(
         styled,
         width="content",
